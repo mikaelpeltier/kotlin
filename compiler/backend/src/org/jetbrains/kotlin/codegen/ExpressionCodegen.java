@@ -43,7 +43,7 @@ import org.jetbrains.kotlin.codegen.intrinsics.*;
 import org.jetbrains.kotlin.codegen.pseudoInsns.PseudoInsnsKt;
 import org.jetbrains.kotlin.codegen.range.RangeValue;
 import org.jetbrains.kotlin.codegen.range.RangeValuesKt;
-import org.jetbrains.kotlin.codegen.range.forLoop.ForLoopGenerator;
+import org.jetbrains.kotlin.codegen.range.forLoop.*;
 import org.jetbrains.kotlin.codegen.signature.BothSignatureWriter;
 import org.jetbrains.kotlin.codegen.signature.JvmSignatureWriter;
 import org.jetbrains.kotlin.codegen.state.GenerationState;
@@ -100,6 +100,7 @@ import org.jetbrains.org.objectweb.asm.commons.InstructionAdapter;
 import org.jetbrains.org.objectweb.asm.commons.Method;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static org.jetbrains.kotlin.builtins.KotlinBuiltIns.isInt;
 import static org.jetbrains.kotlin.codegen.AsmUtil.*;
@@ -595,7 +596,7 @@ public class ExpressionCodegen extends KtVisitor<StackValue, StackValue> impleme
         KtExpression range = forExpression.getLoopRange();
         assert range != null : "No loop range in for expression";
         RangeValue rangeValue = RangeValuesKt.createRangeValueForExpression(this, range);
-        generateForLoop(rangeValue.createForLoopGenerator(this, forExpression));
+        generateForLoop(rangeValue.createForLoopGenerator(this, forExpression), rangeValue);
     }
 
     @NotNull
@@ -619,7 +620,63 @@ public class ExpressionCodegen extends KtVisitor<StackValue, StackValue> impleme
         return context.getContextKind();
     }
 
-    private void generateForLoop(ForLoopGenerator generator) {
+    private static AtomicLong loopCount = new AtomicLong(0);
+    private static AtomicLong forInSimpleProgressionLoopGeneratorCount = new AtomicLong(0);
+    private static AtomicLong forInRangeInstanceLoopGeneratorCount = new AtomicLong(0);
+    private static AtomicLong forInProgressionExpressionLoopGeneratorCount = new AtomicLong(0);
+    private static AtomicLong loopIntoInlineFunctions = new AtomicLong(0);
+    private static AtomicLong unsupportedLoopIntoInlineFunctions = new AtomicLong(0);
+
+    private synchronized void generateForLoop(ForLoopGenerator generator, RangeValue rangeValue) {
+        loopCount.getAndIncrement();
+        if (context.getFunctionDescriptor().isInline()) {
+            loopIntoInlineFunctions.getAndIncrement();
+        }
+        if (generator instanceof ForInSimpleProgressionLoopGenerator) {
+            if (((ForInSimpleProgressionLoopGenerator) generator).isEndInclusive()) {
+                if (context.getFunctionDescriptor().isInline()) {
+                    unsupportedLoopIntoInlineFunctions.getAndIncrement();
+                }
+                ((ForInSimpleProgressionLoopGenerator) generator)
+                        .dumpStat(loopCount.get(), forInSimpleProgressionLoopGeneratorCount.incrementAndGet(),
+                                  forInRangeInstanceLoopGeneratorCount.get(), forInProgressionExpressionLoopGeneratorCount.get(), this,
+                                  loopIntoInlineFunctions.get(), unsupportedLoopIntoInlineFunctions.get());
+            }
+            else {
+                ForInSimpleProgressionLoopGeneratorKt.dumpEmptyStat(loopCount.get(), forInSimpleProgressionLoopGeneratorCount.get(),
+                                                                    forInRangeInstanceLoopGeneratorCount.get(),
+                                                                    forInProgressionExpressionLoopGeneratorCount.get(),
+                                                                    loopIntoInlineFunctions.get(),
+                                                                    unsupportedLoopIntoInlineFunctions.get());
+            }
+        }
+        else if (generator instanceof ForInRangeInstanceLoopGenerator) {
+            if (context.getFunctionDescriptor().isInline()) {
+                unsupportedLoopIntoInlineFunctions.getAndIncrement();
+            }
+            ((ForInRangeInstanceLoopGenerator) generator)
+                    .dumpStat(loopCount.get(), forInSimpleProgressionLoopGeneratorCount.get(),
+                              forInRangeInstanceLoopGeneratorCount.incrementAndGet(),
+                              forInProgressionExpressionLoopGeneratorCount.get(), this, loopIntoInlineFunctions.get(),
+                              unsupportedLoopIntoInlineFunctions.get());
+        }
+        else if (generator instanceof ForInProgressionExpressionLoopGenerator) {
+            if (context.getFunctionDescriptor().isInline()) {
+                unsupportedLoopIntoInlineFunctions.getAndIncrement();
+            }
+            ((ForInProgressionExpressionLoopGenerator) generator)
+                    .dumpStat(loopCount.get(), forInSimpleProgressionLoopGeneratorCount.get(),
+                              forInRangeInstanceLoopGeneratorCount.get(),
+                              forInProgressionExpressionLoopGeneratorCount.incrementAndGet(),
+                              this, loopIntoInlineFunctions.get(), unsupportedLoopIntoInlineFunctions.get());
+        }
+        else {
+            ForInSimpleProgressionLoopGeneratorKt.dumpEmptyStat(loopCount.get(), forInSimpleProgressionLoopGeneratorCount.get(),
+                                                                forInRangeInstanceLoopGeneratorCount.get(),
+                                                                forInProgressionExpressionLoopGeneratorCount.get(),
+                                                                loopIntoInlineFunctions.get(), unsupportedLoopIntoInlineFunctions.get());
+        }
+
         Label loopExit = new Label();
         Label loopEntry = new Label();
         Label continueLabel = new Label();

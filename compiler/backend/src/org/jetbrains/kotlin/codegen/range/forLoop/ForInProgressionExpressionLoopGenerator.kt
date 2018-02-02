@@ -17,8 +17,10 @@
 package org.jetbrains.kotlin.codegen.range.forLoop
 
 import org.jetbrains.kotlin.codegen.ExpressionCodegen
+import org.jetbrains.kotlin.diagnostics.DiagnosticUtils
 import org.jetbrains.kotlin.psi.KtExpression
 import org.jetbrains.kotlin.psi.KtForExpression
+import java.io.File
 
 class ForInProgressionExpressionLoopGenerator(
     codegen: ExpressionCodegen,
@@ -33,5 +35,27 @@ class ForInProgressionExpressionLoopGenerator(
         generateRangeOrProgressionProperty(asmLoopRangeType, "getFirst", asmElementType, loopParameterType, loopParameterVar)
         generateRangeOrProgressionProperty(asmLoopRangeType, "getLast", asmElementType, asmElementType, endVar)
         generateRangeOrProgressionProperty(asmLoopRangeType, "getStep", incrementType, incrementType, incrementVar)
+    }
+
+    fun dumpStat(
+        loopCount: Long,
+        forInSimpleProgressionLoopGeneratorCount: Long,
+        forInRangeInstanceLoopGeneratorCount: Long,
+        forInProgressionExpressionLoopGeneratorCount: Long,
+        codegen: ExpressionCodegen,
+        loopIntoInlineFunctions: Long,
+        unsupportedLoopIntoInlineFunctions: Long
+    ) {
+        val badLoopCount = forInSimpleProgressionLoopGeneratorCount + forInRangeInstanceLoopGeneratorCount +
+                +forInProgressionExpressionLoopGeneratorCount
+        val f = File("/tmp/loop-statistics")
+        var mess = "Loop (" + badLoopCount + "/" + loopCount + "/(" + forInSimpleProgressionLoopGeneratorCount + ", " +
+                +forInRangeInstanceLoopGeneratorCount + ", " + forInProgressionExpressionLoopGeneratorCount + ")/(" +
+                +loopIntoInlineFunctions + ", " + unsupportedLoopIntoInlineFunctions + "))"
+        mess += " ForInProgressionExpressionLoopGenerator:\n"
+        mess += forExpression.loopRange!!.text + " in file " + DiagnosticUtils.atLocation(forExpression.loopRange) + "\n"
+        mess += detailStat(forExpression.loopRange!!, codegen, bindingContext)
+        println(mess)
+        f.appendText(mess + "\n")
     }
 }

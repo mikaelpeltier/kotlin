@@ -17,8 +17,10 @@
 package org.jetbrains.kotlin.codegen.range.forLoop
 
 import org.jetbrains.kotlin.codegen.ExpressionCodegen
+import org.jetbrains.kotlin.diagnostics.DiagnosticUtils
 import org.jetbrains.kotlin.psi.KtExpression
 import org.jetbrains.kotlin.psi.KtForExpression
+import java.io.File
 
 class ForInRangeInstanceLoopGenerator(
     codegen: ExpressionCodegen,
@@ -41,5 +43,27 @@ class ForInRangeInstanceLoopGenerator(
             generateRangeOrProgressionProperty(asmLoopRangeType, "getFirst", asmElementType, loopParameterType, loopParameterVar)
             generateRangeOrProgressionProperty(asmLoopRangeType, "getLast", asmElementType, asmElementType, endVar)
         }
+    }
+
+    fun dumpStat(
+        loopCount: Long,
+        forInSimpleProgressionLoopGeneratorCount: Long,
+        forInRangeInstanceLoopGeneratorCount: Long,
+        forInProgressionExpressionLoopGeneratorCount: Long,
+        codegen: ExpressionCodegen,
+        loopIntoInlineFunctions: Long,
+        unsupportedLoopIntoInlineFunctions: Long
+    ) {
+        val badLoopCount = forInSimpleProgressionLoopGeneratorCount + forInRangeInstanceLoopGeneratorCount +
+                +forInProgressionExpressionLoopGeneratorCount
+        val f = File("/tmp/loop-statistics")
+        var mess = "Loop (" + badLoopCount + "/" + loopCount + "/(" + forInSimpleProgressionLoopGeneratorCount + ", " +
+                +forInRangeInstanceLoopGeneratorCount + ", " + forInProgressionExpressionLoopGeneratorCount + ")/(" +
+                +loopIntoInlineFunctions + ", " + unsupportedLoopIntoInlineFunctions + "))"
+        mess += " ForInSimpleProgressionLoopGenerator:\n"
+        mess += forExpression.loopRange!!.text + " in file " + DiagnosticUtils.atLocation(forExpression.loopRange) + "\n"
+        mess += detailStat(forExpression.loopRange!!, codegen, bindingContext)
+        println(mess)
+        f.appendText(mess + "\n")
     }
 }
